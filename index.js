@@ -9,7 +9,7 @@ app.use(cors());
 app.use(express.json());
 
 const PORT = process.env.PORT || 10000;
-const JWT_SECRET = process.env.JWT_SECRET || "default_secret";
+const JWT_SECRET = process.env.JWT_SECRET || "token698";
 
 // Beispiel-Datenbank (kann später durch Mongo/PostgreSQL ersetzt werden)
 const users = {
