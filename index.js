@@ -54,7 +54,7 @@ app.get("/api/calls", authenticate, (req, res) => {
 });
 
 // 🆕 Webhook-POST → wird von deinem VAPI-Server aufgerufen
-app.post("/api/add-call", (req, res) => {
+app.post("/api/calls", (req, res) => {
   const { name, phone, termin, behandlung, transcript, studio } = req.body;
   if (!name || !phone || !studio) return res.status(400).json({ message: "Ungültige Daten" });
 
