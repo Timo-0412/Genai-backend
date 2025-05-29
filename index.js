@@ -11,7 +11,6 @@ app.use(express.json());
 const PORT = process.env.PORT || 10000;
 const JWT_SECRET = "meinGeheimerTestKey123";
 
-// Beispiel-Datenbank (kann später durch Mongo/PostgreSQL ersetzt werden)
 const users = {
   "admin@genai.de": { password: "adminpass", role: "admin" },
   "kosami@genai.de": { password: "studio123", role: "kosami" },
@@ -19,13 +18,9 @@ const users = {
   "robrahn@genai.de": { password: "studio123", role: "robrahn" }
 };
 
-const calls = [
-  { name: "Lisa Müller", phone: "0176123456", behandlung: "Gesichtsbehandlung", termin: "Dienstag 14:00", transkript: "Ich hätte gern Dienstag 14 Uhr", studio: "kosami" },
-  { name: "Janine Weber", phone: "0176987654", behandlung: "Massage", termin: "Freitag 10:00", transkript: "Termin am Freitag um 10", studio: "wintermantel" },
-  { name: "Franziska Koch", phone: "0176111222", behandlung: "Fußpflege", termin: "Montag 12:00", transkript: "Montag mittags passt gut", studio: "robrahn" }
-];
+// 🆕 Dynamisch gespeicherte Calls
+const calls = [];
 
-// Login-Route → gibt Token zurück
 app.post("/api/login", (req, res) => {
   const { email, password } = req.body;
   const user = users[email];
@@ -37,7 +32,6 @@ app.post("/api/login", (req, res) => {
   res.json({ token });
 });
 
-// Middleware zum Prüfen des Tokens
 function authenticate(req, res, next) {
   const auth = req.headers.authorization;
   if (!auth) return res.status(401).json({ message: "Kein Token übermittelt" });
@@ -52,7 +46,6 @@ function authenticate(req, res, next) {
   }
 }
 
-// Geschützte Route → nur mit Token erreichbar
 app.get("/api/calls", authenticate, (req, res) => {
   const { role } = req.user;
   if (role === "admin") return res.json(calls);
@@ -60,7 +53,15 @@ app.get("/api/calls", authenticate, (req, res) => {
   res.json(filtered);
 });
 
-// Test
+// 🆕 Webhook-POST → wird von deinem VAPI-Server aufgerufen
+app.post("/api/add-call", (req, res) => {
+  const { name, phone, termin, behandlung, transcript, studio } = req.body;
+  if (!name || !phone || !studio) return res.status(400).json({ message: "Ungültige Daten" });
+
+  calls.push({ name, phone, termin, behandlung, transcript, studio });
+  res.status(200).json({ message: "✅ Call gespeichert" });
+});
+
 app.get("/", (req, res) => {
   res.send("GenAi Backend läuft ✅");
 });
