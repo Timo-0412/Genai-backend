@@ -11,6 +11,7 @@ app.use(express.json());
 const PORT = process.env.PORT || 10000;
 const JWT_SECRET = "meinGeheimerTestKey123";
 
+// Benutzerliste mit Rollen
 const users = {
   "admin@genai.de": { password: "adminpass", role: "admin" },
   "kosami@genai.de": { password: "studio123", role: "kosami" },
@@ -18,9 +19,10 @@ const users = {
   "robrahn@genai.de": { password: "studio123", role: "robrahn" }
 };
 
-// 🆕 Dynamisch gespeicherte Calls
+// Dynamisch gespeicherte Anrufe
 const calls = [];
 
+// Login-Route
 app.post("/api/login", (req, res) => {
   const { email, password } = req.body;
   const user = users[email];
@@ -32,6 +34,7 @@ app.post("/api/login", (req, res) => {
   res.json({ token });
 });
 
+// Authentifizierungsmiddleware
 function authenticate(req, res, next) {
   const auth = req.headers.authorization;
   if (!auth) return res.status(401).json({ message: "Kein Token übermittelt" });
@@ -46,6 +49,7 @@ function authenticate(req, res, next) {
   }
 }
 
+// Daten für das Dashboard abrufen
 app.get("/api/calls", authenticate, (req, res) => {
   const { role } = req.user;
   if (role === "admin") return res.json(calls);
@@ -53,15 +57,19 @@ app.get("/api/calls", authenticate, (req, res) => {
   res.json(filtered);
 });
 
-// 🆕 Webhook-POST → wird von deinem VAPI-Server aufgerufen
+// Webhook-Eintrag entgegennehmen
 app.post("/api/calls", (req, res) => {
-  const { name, phone, termin, behandlung, transcript, studio } = req.body;
-  if (!name || !phone || !studio) return res.status(400).json({ message: "Ungültige Daten" });
+  const { name, phone, termin, behandlung, transkript, studio } = req.body;
 
-  calls.push({ name, phone, termin, behandlung, transcript, studio });
+  if (!name || !phone || !studio) {
+    return res.status(400).json({ message: "Ungültige Daten" });
+  }
+
+  calls.push({ name, phone, termin, behandlung, transkript, studio });
   res.status(200).json({ message: "✅ Call gespeichert" });
 });
 
+// Testroute
 app.get("/", (req, res) => {
   res.send("GenAi Backend läuft ✅");
 });
