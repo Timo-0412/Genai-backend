@@ -51,7 +51,7 @@ function authenticate(req, res, next) {
   }
 }
 
-// Daten fürs Dashboard
+// Dashboard-Daten abrufen
 app.get("/api/calls", authenticate, (req, res) => {
   const { role } = req.user;
   if (role === "admin") return res.json(calls);
@@ -59,7 +59,7 @@ app.get("/api/calls", authenticate, (req, res) => {
   res.json(filtered);
 });
 
-// VAPI-Eintrag mit smarter Datumserkennung
+// Webhook-Daten empfangen
 app.post("/api/calls", (req, res) => {
   const {
     name,
@@ -75,25 +75,21 @@ app.post("/api/calls", (req, res) => {
     return res.status(400).json({ message: "Ungültige Daten" });
   }
 
-  let parsedDateString = null;
+  let parsedDateISO = null;
 
   // 1. Versuch: Datum aus summary erkennen (z. B. "Tuesday, July 15 at 11:00 AM")
   if (summary) {
     const parsed = chrono.en.parseDate(summary);
     if (parsed) {
-      parsedDateString = DateTime.fromJSDate(parsed)
-        .setZone("Europe/Berlin")
-        .toFormat("cccc, dd.LL.yyyy, HH:mm 'Uhr'");
+      parsedDateISO = DateTime.fromJSDate(parsed).setZone("Europe/Berlin").toISO();
     }
   }
 
   // 2. Fallback: aus deutschem Transkript
-  if (!parsedDateString && transkript) {
+  if (!parsedDateISO && transkript) {
     const parsed = chrono.de.parseDate(transkript);
     if (parsed) {
-      parsedDateString = DateTime.fromJSDate(parsed)
-        .setZone("Europe/Berlin")
-        .toFormat("cccc, dd.LL.yyyy, HH:mm 'Uhr'");
+      parsedDateISO = DateTime.fromJSDate(parsed).setZone("Europe/Berlin").toISO();
     }
   }
 
@@ -101,7 +97,7 @@ app.post("/api/calls", (req, res) => {
     name,
     phone,
     behandlung,
-    termin: parsedDateString || termin || "unbekannt",
+    termin: parsedDateISO || termin || "unbekannt",
     transkript,
     summary,
     studio,
