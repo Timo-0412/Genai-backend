@@ -51,7 +51,7 @@ function authenticate(req, res, next) {
   }
 }
 
-// Dashboard-Daten
+// 📊 Dashboard-Daten
 app.get("/api/calls", authenticate, (req, res) => {
   const { role } = req.user;
   if (role === "admin") return res.json(calls);
@@ -59,7 +59,7 @@ app.get("/api/calls", authenticate, (req, res) => {
   res.json(filtered);
 });
 
-// Webhook von VAPI
+// 📥 Webhook von VAPI (Termin-Erkennung + MEZ-Korrektur)
 app.post("/api/calls", (req, res) => {
   const {
     name,
@@ -77,7 +77,7 @@ app.post("/api/calls", (req, res) => {
 
   let parsedDateISO = null;
 
-  // 🟣 1. Priorität: Transkript deutsch mit chrono.de
+  // 🟣 1. Transkript (deutsch)
   if (transkript) {
     const result = chrono.de.parse(transkript);
     if (result.length > 0) {
@@ -86,7 +86,7 @@ app.post("/api/calls", (req, res) => {
     }
   }
 
-  // 🟣 2. Fallback: summary englisch mit chrono.en
+  // 🟣 2. Fallback: Summary (englisch)
   if (!parsedDateISO && summary) {
     const result = chrono.en.parse(summary);
     if (result.length > 0) {
@@ -95,10 +95,19 @@ app.post("/api/calls", (req, res) => {
     }
   }
 
-  // 🟡 Wenn alles fehlschlägt, nimm "termin" mit Zeitzone oder "unbekannt"
-  const finalTermin = parsedDateISO || (termin ? DateTime.fromISO(termin).setZone("Europe/Berlin").toISO() : "unbekannt");
+  // 🟡 TERMIN-PRIORITÄT: zuerst 'termin' nutzen (aber MEZ setzen)
+  let finalTermin = "unbekannt";
+  if (termin) {
+    try {
+      finalTermin = DateTime.fromISO(termin).setZone("Europe/Berlin").toISO();
+    } catch {
+      finalTermin = "unbekannt";
+    }
+  } else if (parsedDateISO) {
+    finalTermin = parsedDateISO;
+  }
 
-  // Speichern
+  // 💾 Speichern
   calls.push({
     name,
     phone,
@@ -120,7 +129,7 @@ app.post("/api/calls", (req, res) => {
   res.status(200).json({ message: "✅ Call gespeichert" });
 });
 
-// Testroute
+// Test-Route
 app.get("/", (req, res) => {
   res.send("✅ GenAi Backend läuft");
 });
