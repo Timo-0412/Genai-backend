@@ -134,6 +134,40 @@ app.get("/", (req, res) => {
   res.send("✅ GenAi Backend läuft");
 });
 
+app.post("/api/confirm", authenticate, async (req, res) => {
+  const { index, kommentar } = req.body;
+
+  if (typeof index !== "number" || !calls[index]) {
+    return res.status(400).json({ message: "Ungültiger Eintrag" });
+  }
+
+  const eintrag = calls[index];
+  const nummer = eintrag.phone.startsWith("49") ? eintrag.phone : `49${eintrag.phone.replace(/^0+/, "")}`;
+
+  const text = `✅ Termin bestätigt für ${eintrag.name} am ${DateTime.fromISO(eintrag.termin).setZone("Europe/Berlin").toFormat("dd.LL.yyyy – HH:mm")} Uhr.\n${kommentar || ""}`.trim();
+
+  try {
+    const result = await axios.post("https://gateway.seven.io/api/sms", null, {
+      params: {
+        to: nummer,
+        text: text,
+        from: "Kosmetik",
+        p: process.env.SEVEN_API_KEY,
+      },
+    });
+
+    // Markiere den Call als bestätigt
+    calls[index].status = "bestätigt";
+    calls[index].kommentar = kommentar;
+
+    res.status(200).json({ message: "SMS gesendet", sms: result.data });
+  } catch (err) {
+    console.error("❌ Fehler beim Senden:", err.message);
+    res.status(500).json({ message: "Fehler beim SMS-Versand" });
+  }
+});
+
+
 // Server starten
 app.listen(PORT, () => {
   console.log("🚀 Backend läuft auf Port", PORT);
