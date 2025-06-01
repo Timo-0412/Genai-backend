@@ -2,7 +2,7 @@ import express from "express";
 import cors from "cors";
 import dotenv from "dotenv";
 import jwt from "jsonwebtoken";
-import chrono from "chrono-node";
+import * as chrono from "chrono-node";
 import { DateTime } from "luxon";
 
 dotenv.config();
