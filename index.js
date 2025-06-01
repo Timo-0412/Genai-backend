@@ -2,6 +2,8 @@ import express from "express";
 import cors from "cors";
 import dotenv from "dotenv";
 import jwt from "jsonwebtoken";
+import chrono from "chrono-node";
+import { DateTime } from "luxon";
 
 dotenv.config();
 const app = express();
@@ -65,9 +67,30 @@ app.post("/api/calls", (req, res) => {
     return res.status(400).json({ message: "Ungültige Daten" });
   }
 
-  calls.push({ name, phone, termin, behandlung, transkript, studio });
+  // Versuche Datum und Uhrzeit aus dem Transkript zu erkennen
+  let parsedDate = null;
+  if (transkript) {
+    const results = chrono.de.parse(transkript);
+    if (results.length > 0) {
+      const parsed = results[0].start.date(); // z. B. "1. August um 16 Uhr"
+      parsedDate = DateTime.fromJSDate(parsed)
+        .setZone("Europe/Berlin")
+        .toISO(); // z. B. 2025-08-01T16:00:00+02:00
+    }
+  }
+
+  calls.push({
+    name,
+    phone,
+    behandlung,
+    termin: parsedDate || termin,
+    transkript,
+    studio,
+  });
+
   res.status(200).json({ message: "✅ Call gespeichert" });
 });
+
 
 // Testroute
 app.get("/", (req, res) => {
