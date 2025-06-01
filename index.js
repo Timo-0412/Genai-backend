@@ -18,10 +18,10 @@ const users = {
   "admin@genai.de": { password: "adminpass", role: "admin" },
   "kosami@genai.de": { password: "studio123", role: "kosami" },
   "wintermantel@genai.de": { password: "studio123", role: "wintermantel" },
-  "robrahn@genai.de": { password: "studio123", role: "robrahn" }
+  "robrahn@genai.de": { password: "studio123", role: "robrahn" },
 };
 
-// Dynamisch gespeicherte Anrufe
+// Temporärer Speicher für Anrufe
 const calls = [];
 
 // Login-Route
@@ -36,7 +36,7 @@ app.post("/api/login", (req, res) => {
   res.json({ token });
 });
 
-// Authentifizierungsmiddleware
+// Middleware zur Authentifizierung
 function authenticate(req, res, next) {
   const auth = req.headers.authorization;
   if (!auth) return res.status(401).json({ message: "Kein Token übermittelt" });
@@ -51,7 +51,7 @@ function authenticate(req, res, next) {
   }
 }
 
-// Dashboard-Daten abrufen
+// Daten fürs Dashboard
 app.get("/api/calls", authenticate, (req, res) => {
   const { role } = req.user;
   if (role === "admin") return res.json(calls);
@@ -59,7 +59,7 @@ app.get("/api/calls", authenticate, (req, res) => {
   res.json(filtered);
 });
 
-// Webhook-Daten empfangen
+// Webhook-Route von VAPI
 app.post("/api/calls", (req, res) => {
   const {
     name,
@@ -77,22 +77,23 @@ app.post("/api/calls", (req, res) => {
 
   let parsedDateISO = null;
 
-  // 1. Versuch: Datum aus summary erkennen (z. B. "Tuesday, July 15 at 11:00 AM")
-  if (summary) {
-    const parsed = chrono.en.parseDate(summary);
-    if (parsed) {
-      parsedDateISO = DateTime.fromJSDate(parsed).setZone("Europe/Berlin").toISO();
-    }
-  }
-
-  // 2. Fallback: aus deutschem Transkript
-  if (!parsedDateISO && transkript) {
+  // 1. PRIORITÄT: Datum aus deutschem Transkript erkennen
+  if (transkript) {
     const parsed = chrono.de.parseDate(transkript);
     if (parsed) {
       parsedDateISO = DateTime.fromJSDate(parsed).setZone("Europe/Berlin").toISO();
     }
   }
 
+  // 2. FALLBACK: englisches Summary analysieren
+  if (!parsedDateISO && summary) {
+    const parsed = chrono.en.parseDate(summary);
+    if (parsed) {
+      parsedDateISO = DateTime.fromJSDate(parsed).setZone("Europe/Berlin").toISO();
+    }
+  }
+
+  // Speichern
   calls.push({
     name,
     phone,
@@ -103,14 +104,23 @@ app.post("/api/calls", (req, res) => {
     studio,
   });
 
+  console.log("✅ Erfolgreich gespeichert:", {
+    name,
+    phone,
+    behandlung,
+    termin: parsedDateISO || termin,
+    studio,
+  });
+
   res.status(200).json({ message: "✅ Call gespeichert" });
 });
 
-// Test-Route
+// Testroute
 app.get("/", (req, res) => {
   res.send("✅ GenAi Backend läuft");
 });
 
+// Start
 app.listen(PORT, () => {
   console.log("🚀 Backend läuft auf Port", PORT);
 });
