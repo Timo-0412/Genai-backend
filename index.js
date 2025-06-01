@@ -77,21 +77,22 @@ app.post("/api/calls", (req, res) => {
 
   let parsedDateISO = null;
 
-  // 1. PRIORITÄT: Datum aus deutschem Transkript erkennen
-  if (transkript) {
-    const parsed = chrono.de.parseDate(transkript);
-    if (parsed) {
-      parsedDateISO = DateTime.fromJSDate(parsed).setZone("Europe/Berlin").toISO();
+  // 1. Versuche deutsches Transkript zu erkennen
+  const germanDate = chrono.de.parseDate(transkript || "");
+  if (germanDate) {
+    parsedDateISO = DateTime.fromJSDate(germanDate).setZone("Europe/Berlin").toISO();
+  } else {
+    // 2. Fallback: englisches Summary analysieren
+    const englishDate = chrono.en.parseDate(summary || "");
+    if (englishDate) {
+      parsedDateISO = DateTime.fromJSDate(englishDate).setZone("Europe/Berlin").toISO();
     }
   }
 
-  // 2. FALLBACK: englisches Summary analysieren
-  if (!parsedDateISO && summary) {
-    const parsed = chrono.en.parseDate(summary);
-    if (parsed) {
-      parsedDateISO = DateTime.fromJSDate(parsed).setZone("Europe/Berlin").toISO();
-    }
-  }
+  // Logging zur Kontrolle
+  console.log("📅 Parsed aus transcript:", germanDate);
+  console.log("📅 Parsed aus summary:", chrono.en.parseDate(summary || ""));
+  console.log("✅ Final ISO-Termin:", parsedDateISO);
 
   // Speichern
   calls.push({
@@ -101,14 +102,6 @@ app.post("/api/calls", (req, res) => {
     termin: parsedDateISO || termin || "unbekannt",
     transkript,
     summary,
-    studio,
-  });
-
-  console.log("✅ Erfolgreich gespeichert:", {
-    name,
-    phone,
-    behandlung,
-    termin: parsedDateISO || termin,
     studio,
   });
 
