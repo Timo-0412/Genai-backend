@@ -118,16 +118,41 @@ app.post("/api/calls", async (req, res) => {
     transkript,
     summary,
     studio,
-    status: "bestätigt",
+    status: "offen",
     kommentar
   };
 
   calls.push(callEntry);
 
-  // 📲 Automatische SMS nach Speicherung
-  const nummer = phone.startsWith("49") ? phone : `49${phone.replace(/^0+/, "")}`;
-  const terminText = DateTime.fromISO(finalTermin).setZone("Europe/Berlin").toFormat("dd.LL.yyyy – HH:mm");
-  const baseText = `✅ Termin bestätigt für ${name} am ${terminText} Uhr. Bitte seien Sie 5 Minuten früher da.`;
+  console.log("✅ Erfolgreich gespeichert:", {
+    name,
+    phone,
+    behandlung,
+    termin: finalTermin,
+    studio,
+  });
+
+  res.status(200).json({ message: "✅ Call gespeichert" });
+});
+
+// 📩 SMS-Versand bei manueller Bestätigung
+app.post("/api/confirm", authenticate, async (req, res) => {
+  const { index, kommentar } = req.body;
+
+  if (typeof index !== "number" || !calls[index]) {
+    return res.status(400).json({ message: "Ungültiger Eintrag" });
+  }
+
+  const eintrag = calls[index];
+  const nummer = eintrag.phone.startsWith("49") ? eintrag.phone : `49${eintrag.phone.replace(/^0+/, "")}`;
+
+  // -2 Stunden abziehen für SMS
+  const terminText = DateTime.fromISO(eintrag.termin)
+    .setZone("Europe/Berlin")
+    .minus({ hours: 2 })
+    .toFormat("dd.LL.yyyy – HH:mm");
+
+  const baseText = `✅ Termin bestätigt für ${eintrag.name} am ${terminText} Uhr. Bitte seien Sie 5 Minuten früher da.`;
   const fullText = kommentar ? `${baseText}\n${kommentar}` : baseText;
 
   try {
@@ -140,20 +165,15 @@ app.post("/api/calls", async (req, res) => {
       },
     });
 
-    console.log("📤 SMS gesendet an", nummer);
+    // Status speichern
+    calls[index].status = "bestätigt";
+    calls[index].kommentar = kommentar;
+
+    res.status(200).json({ message: "SMS gesendet", sms: result.data });
   } catch (err) {
     console.error("❌ Fehler beim SMS-Versand:", err.message);
+    res.status(500).json({ message: "Fehler beim SMS-Versand" });
   }
-
-  console.log("✅ Erfolgreich gespeichert:", {
-    name,
-    phone,
-    behandlung,
-    termin: finalTermin,
-    studio,
-  });
-
-  res.status(200).json({ message: "✅ Call gespeichert" });
 });
 
 // Test-Route
