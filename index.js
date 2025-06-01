@@ -4,6 +4,7 @@ import dotenv from "dotenv";
 import jwt from "jsonwebtoken";
 import * as chrono from "chrono-node";
 import { DateTime } from "luxon";
+import axios from "axios";
 
 dotenv.config();
 const app = express();
@@ -60,7 +61,7 @@ app.get("/api/calls", authenticate, (req, res) => {
 });
 
 // 📥 Webhook von VAPI (Termin-Erkennung + MEZ-Korrektur)
-app.post("/api/calls", (req, res) => {
+app.post("/api/calls", async (req, res) => {
   const {
     name,
     phone,
@@ -69,6 +70,7 @@ app.post("/api/calls", (req, res) => {
     transkript,
     summary,
     studio,
+    kommentar = ""
   } = req.body;
 
   if (!name || !phone || !studio) {
@@ -108,7 +110,7 @@ app.post("/api/calls", (req, res) => {
   }
 
   // 💾 Speichern
-  calls.push({
+  const callEntry = {
     name,
     phone,
     behandlung,
@@ -116,7 +118,32 @@ app.post("/api/calls", (req, res) => {
     transkript,
     summary,
     studio,
-  });
+    status: "bestätigt",
+    kommentar
+  };
+
+  calls.push(callEntry);
+
+  // 📲 Automatische SMS nach Speicherung
+  const nummer = phone.startsWith("49") ? phone : `49${phone.replace(/^0+/, "")}`;
+  const terminText = DateTime.fromISO(finalTermin).setZone("Europe/Berlin").toFormat("dd.LL.yyyy – HH:mm");
+  const baseText = `✅ Termin bestätigt für ${name} am ${terminText} Uhr. Bitte seien Sie 5 Minuten früher da.`;
+  const fullText = kommentar ? `${baseText}\n${kommentar}` : baseText;
+
+  try {
+    const result = await axios.post("https://gateway.seven.io/api/sms", null, {
+      params: {
+        to: nummer,
+        text: fullText,
+        from: "Kosmetik",
+        p: process.env.SEVEN_API_KEY,
+      },
+    });
+
+    console.log("📤 SMS gesendet an", nummer);
+  } catch (err) {
+    console.error("❌ Fehler beim SMS-Versand:", err.message);
+  }
 
   console.log("✅ Erfolgreich gespeichert:", {
     name,
@@ -133,40 +160,6 @@ app.post("/api/calls", (req, res) => {
 app.get("/", (req, res) => {
   res.send("✅ GenAi Backend läuft");
 });
-
-app.post("/api/confirm", authenticate, async (req, res) => {
-  const { index, kommentar } = req.body;
-
-  if (typeof index !== "number" || !calls[index]) {
-    return res.status(400).json({ message: "Ungültiger Eintrag" });
-  }
-
-  const eintrag = calls[index];
-  const nummer = eintrag.phone.startsWith("49") ? eintrag.phone : `49${eintrag.phone.replace(/^0+/, "")}`;
-
-  const text = `✅ Termin bestätigt für ${eintrag.name} am ${DateTime.fromISO(eintrag.termin).setZone("Europe/Berlin").toFormat("dd.LL.yyyy – HH:mm")} Uhr.\n${kommentar || ""}`.trim();
-
-  try {
-    const result = await axios.post("https://gateway.seven.io/api/sms", null, {
-      params: {
-        to: nummer,
-        text: text,
-        from: "Kosmetik",
-        p: process.env.SEVEN_API_KEY,
-      },
-    });
-
-    // Markiere den Call als bestätigt
-    calls[index].status = "bestätigt";
-    calls[index].kommentar = kommentar;
-
-    res.status(200).json({ message: "SMS gesendet", sms: result.data });
-  } catch (err) {
-    console.error("❌ Fehler beim Senden:", err.message);
-    res.status(500).json({ message: "Fehler beim SMS-Versand" });
-  }
-});
-
 
 // Server starten
 app.listen(PORT, () => {
