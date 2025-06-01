@@ -59,23 +59,41 @@ app.get("/api/calls", authenticate, (req, res) => {
   res.json(filtered);
 });
 
-// Webhook-Eintrag entgegennehmen
+// Webhook-Eintrag entgegennehmen mit smarter Datumserkennung (summary > transcript)
 app.post("/api/calls", (req, res) => {
-  const { name, phone, termin, behandlung, transkript, studio } = req.body;
+  const {
+    name,
+    phone,
+    termin, // optional fallback
+    behandlung,
+    transkript,
+    summary, // wichtig: summary wird jetzt genutzt
+    studio,
+  } = req.body;
 
   if (!name || !phone || !studio) {
     return res.status(400).json({ message: "Ungültige Daten" });
   }
 
-  // Versuche Datum und Uhrzeit aus dem Transkript zu erkennen
   let parsedDate = null;
-  if (transkript) {
-    const results = chrono.de.parse(transkript);
-    if (results.length > 0) {
-      const parsed = results[0].start.date(); // z. B. "1. August um 16 Uhr"
+
+  // 1. Versuch: Datum aus summary erkennen (z. B. "for Friday, August 15th at 12:00 PM")
+  if (summary) {
+    const parsed = chrono.en.parseDate(summary);
+    if (parsed) {
       parsedDate = DateTime.fromJSDate(parsed)
         .setZone("Europe/Berlin")
-        .toISO(); // z. B. 2025-08-01T16:00:00+02:00
+        .toISO();
+    }
+  }
+
+  // 2. Fallback: Datum aus deutschem Transkript extrahieren
+  if (!parsedDate && transkript) {
+    const parsed = chrono.de.parseDate(transkript);
+    if (parsed) {
+      parsedDate = DateTime.fromJSDate(parsed)
+        .setZone("Europe/Berlin")
+        .toISO();
     }
   }
 
@@ -85,12 +103,12 @@ app.post("/api/calls", (req, res) => {
     behandlung,
     termin: parsedDate || termin,
     transkript,
+    summary,
     studio,
   });
 
   res.status(200).json({ message: "✅ Call gespeichert" });
 });
-
 
 // Testroute
 app.get("/", (req, res) => {
