@@ -64,10 +64,10 @@ app.post("/api/calls", (req, res) => {
   const {
     name,
     phone,
-    termin, // optional fallback
+    termin,
     behandlung,
     transkript,
-    summary, // wichtig: summary wird jetzt genutzt
+    summary,
     studio,
   } = req.body;
 
@@ -77,23 +77,23 @@ app.post("/api/calls", (req, res) => {
 
   let parsedDate = null;
 
-  // 1. Versuch: Datum aus summary erkennen (z. B. "for Friday, August 15th at 12:00 PM")
+  // 1. Versuch: Datum aus summary (Englisch)
   if (summary) {
     const parsed = chrono.en.parseDate(summary);
     if (parsed) {
       parsedDate = DateTime.fromJSDate(parsed)
         .setZone("Europe/Berlin")
-        .toISO();
+        .toFormat("ccc dd.MM.yyyy, HH:mm");
     }
   }
 
-  // 2. Fallback: Datum aus deutschem Transkript extrahieren
+  // 2. Fallback: Datum aus deutschem Transkript
   if (!parsedDate && transkript) {
     const parsed = chrono.de.parseDate(transkript);
     if (parsed) {
       parsedDate = DateTime.fromJSDate(parsed)
         .setZone("Europe/Berlin")
-        .toISO();
+        .toFormat("ccc dd.MM.yyyy, HH:mm");
     }
   }
 
