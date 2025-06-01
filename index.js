@@ -51,7 +51,7 @@ function authenticate(req, res, next) {
   }
 }
 
-// Daten fürs Dashboard
+// Dashboard-Daten
 app.get("/api/calls", authenticate, (req, res) => {
   const { role } = req.user;
   if (role === "admin") return res.json(calls);
@@ -59,7 +59,7 @@ app.get("/api/calls", authenticate, (req, res) => {
   res.json(filtered);
 });
 
-// Webhook-Route von VAPI
+// Webhook von VAPI
 app.post("/api/calls", (req, res) => {
   const {
     name,
@@ -77,31 +77,43 @@ app.post("/api/calls", (req, res) => {
 
   let parsedDateISO = null;
 
-  // 1. Versuche deutsches Transkript zu erkennen
-  const germanDate = chrono.de.parseDate(transkript || "");
-  if (germanDate) {
-    parsedDateISO = DateTime.fromJSDate(germanDate).setZone("Europe/Berlin").toISO();
-  } else {
-    // 2. Fallback: englisches Summary analysieren
-    const englishDate = chrono.en.parseDate(summary || "");
-    if (englishDate) {
-      parsedDateISO = DateTime.fromJSDate(englishDate).setZone("Europe/Berlin").toISO();
+  // 🟣 1. Priorität: Transkript deutsch mit chrono.de
+  if (transkript) {
+    const result = chrono.de.parse(transkript);
+    if (result.length > 0) {
+      const parsed = result[0].start.date();
+      parsedDateISO = DateTime.fromJSDate(parsed).setZone("Europe/Berlin").toISO();
     }
   }
 
-  // Logging zur Kontrolle
-  console.log("📅 Parsed aus transcript:", germanDate);
-  console.log("📅 Parsed aus summary:", chrono.en.parseDate(summary || ""));
-  console.log("✅ Final ISO-Termin:", parsedDateISO);
+  // 🟣 2. Fallback: summary englisch mit chrono.en
+  if (!parsedDateISO && summary) {
+    const result = chrono.en.parse(summary);
+    if (result.length > 0) {
+      const parsed = result[0].start.date();
+      parsedDateISO = DateTime.fromJSDate(parsed).setZone("Europe/Berlin").toISO();
+    }
+  }
+
+  // 🟡 Wenn alles fehlschlägt, nimm "termin" mit Zeitzone oder "unbekannt"
+  const finalTermin = parsedDateISO || (termin ? DateTime.fromISO(termin).setZone("Europe/Berlin").toISO() : "unbekannt");
 
   // Speichern
   calls.push({
     name,
     phone,
     behandlung,
-    termin: parsedDateISO || termin || "unbekannt",
+    termin: finalTermin,
     transkript,
     summary,
+    studio,
+  });
+
+  console.log("✅ Erfolgreich gespeichert:", {
+    name,
+    phone,
+    behandlung,
+    termin: finalTermin,
     studio,
   });
 
@@ -113,7 +125,7 @@ app.get("/", (req, res) => {
   res.send("✅ GenAi Backend läuft");
 });
 
-// Start
+// Server starten
 app.listen(PORT, () => {
   console.log("🚀 Backend läuft auf Port", PORT);
 });
