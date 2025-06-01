@@ -51,7 +51,7 @@ function authenticate(req, res, next) {
   }
 }
 
-// Daten für das Dashboard abrufen
+// Daten fürs Dashboard
 app.get("/api/calls", authenticate, (req, res) => {
   const { role } = req.user;
   if (role === "admin") return res.json(calls);
@@ -59,13 +59,13 @@ app.get("/api/calls", authenticate, (req, res) => {
   res.json(filtered);
 });
 
-// Webhook-Eintrag entgegennehmen mit smarter Datumserkennung (summary > transcript)
+// VAPI-Eintrag mit smarter Datumserkennung
 app.post("/api/calls", (req, res) => {
   const {
     name,
     phone,
-    termin,
     behandlung,
+    termin,
     transkript,
     summary,
     studio,
@@ -75,25 +75,25 @@ app.post("/api/calls", (req, res) => {
     return res.status(400).json({ message: "Ungültige Daten" });
   }
 
-  let parsedDate = null;
+  let parsedDateString = null;
 
-  // 1. Versuch: Datum aus summary (Englisch)
+  // 1. Versuch: Datum aus summary erkennen (z. B. "Tuesday, July 15 at 11:00 AM")
   if (summary) {
     const parsed = chrono.en.parseDate(summary);
     if (parsed) {
-      parsedDate = DateTime.fromJSDate(parsed)
+      parsedDateString = DateTime.fromJSDate(parsed)
         .setZone("Europe/Berlin")
-        .toFormat("ccc dd.MM.yyyy, HH:mm");
+        .toFormat("cccc, dd.LL.yyyy, HH:mm 'Uhr'");
     }
   }
 
-  // 2. Fallback: Datum aus deutschem Transkript
-  if (!parsedDate && transkript) {
+  // 2. Fallback: aus deutschem Transkript
+  if (!parsedDateString && transkript) {
     const parsed = chrono.de.parseDate(transkript);
     if (parsed) {
-      parsedDate = DateTime.fromJSDate(parsed)
+      parsedDateString = DateTime.fromJSDate(parsed)
         .setZone("Europe/Berlin")
-        .toFormat("ccc dd.MM.yyyy, HH:mm");
+        .toFormat("cccc, dd.LL.yyyy, HH:mm 'Uhr'");
     }
   }
 
@@ -101,7 +101,7 @@ app.post("/api/calls", (req, res) => {
     name,
     phone,
     behandlung,
-    termin: parsedDate || termin,
+    termin: parsedDateString || termin || "unbekannt",
     transkript,
     summary,
     studio,
@@ -110,9 +110,9 @@ app.post("/api/calls", (req, res) => {
   res.status(200).json({ message: "✅ Call gespeichert" });
 });
 
-// Testroute
+// Test-Route
 app.get("/", (req, res) => {
-  res.send("GenAi Backend läuft ✅");
+  res.send("✅ GenAi Backend läuft");
 });
 
 app.listen(PORT, () => {
